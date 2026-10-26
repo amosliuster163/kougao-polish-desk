@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>口播稿打磨台</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2316a34a'/%3E%3Cpath d='M9 10h14M9 16h14M9 22h9' stroke='white' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<meta name="description" content="90分钟，四道检查，两轮修改，停止内耗。AI 初稿的人肉审稿台，数据只存在本机浏览器。">
+<style>
+:root{
+  --green:#16a34a; --green-d:#15803d; --green-l:#eaf7ef; --green-b:#bfe5cd;
+  --ink:#111827; --sub:#6b7280; --line:#e5e7eb; --bg:#f5f7f6;
+  --warn:#b45309; --warn-bg:#fffbeb; --warn-b:#fcd34d;
+  --bad:#dc2626; --bad-bg:#fef2f2; --bad-b:#fca5a5;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  font-size:16px; line-height:1.6; padding-bottom:60px;
+  -webkit-text-size-adjust:100%;
+}
+.wrap{max-width:760px;margin:0 auto;padding:0 12px}
+
+/* 计时条 */
+.timerbar{
+  position:sticky; top:0; z-index:30; background:#fff;
+  border-bottom:1px solid var(--line); padding:10px 0;
+}
+.timerbar .inner{max-width:760px;margin:0 auto;padding:0 12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:space-between}
+#tDisp{font-size:30px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:.5px;color:var(--green)}
+#tDisp.mid{color:var(--warn)} #tDisp.over{color:var(--bad)}
+.tbtns{display:flex;gap:8px;flex-wrap:wrap}
+.tlabel{font-size:12px;color:var(--sub)}
+.banner{display:none;margin:10px 0;padding:12px 14px;border-radius:12px;background:var(--green-l);border:1px solid var(--green-b);color:var(--green-d);font-weight:600}
+.banner.show{display:block}
+
+/* 头图区 */
+header.hd{padding:22px 0 8px}
+h1{font-size:26px;margin:0 0 6px;letter-spacing:.5px}
+.sub{color:var(--sub);font-size:15px;margin:0}
+.tip{font-size:13px;color:var(--sub);margin-top:10px;background:#fff;border:1px dashed var(--line);border-radius:10px;padding:8px 10px}
+
+/* 卡片 */
+section.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px;margin:14px 0}
+.card>h2{font-size:18px;margin:0 0 4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.card>h2 .no{display:inline-flex;width:24px;height:24px;border-radius:8px;background:var(--green-l);color:var(--green-d);font-size:13px;align-items:center;justify-content:center;font-weight:700}
+.desc{color:var(--sub);font-size:13px;margin:0 0 12px}
+fieldset{border:0;margin:0;padding:0}
+label.f{display:block;margin-bottom:12px}
+label.f>span.lb{display:block;font-size:14px;font-weight:600;margin-bottom:6px}
+.hint{font-size:12px;color:var(--sub);margin-top:4px}
+input[type=text],textarea,select{
+  width:100%; font:inherit; font-size:16px; padding:12px;
+  border:1px solid var(--line); border-radius:10px; background:#fff; color:var(--ink);
+}
+textarea{min-height:120px;line-height:1.75;resize:vertical}
+input:focus,textarea:focus,select:focus{outline:2px solid var(--green-b);outline-offset:0}
+textarea.warn{background:var(--warn-bg);border-color:var(--warn-b)}
+textarea.bad{background:var(--bad-bg);border-color:var(--bad-b)}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.stat{font-size:14px;color:var(--sub);margin-top:8px;display:flex;gap:14px;flex-wrap:wrap}
+.stat b{color:var(--ink);font-variant-numeric:tabular-nums}
+.stat .over{color:var(--bad)}
+
+.btn{
+  min-height:48px; padding:12px 18px; border-radius:12px; cursor:pointer;
+  border:1px solid var(--green); background:var(--green); color:#fff;
+  font:inherit; font-size:16px; font-weight:600;
+}
+.btn:active{transform:translateY(1px)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.ghost{background:#fff;color:var(--green)}
+.btn.gray{background:#fff;color:#374151;border-color:var(--line)}
+.btn.wide{width:100%}
+
+/* 状态标记 */
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.chip{font-size:13px;border-radius:99px;padding:4px 12px;border:1px solid var(--line);background:#fafafa;color:var(--sub)}
+.chip.ok{background:var(--green-l);border-color:var(--green-b);color:var(--green-d);font-weight:600}
+.chip.warn{background:var(--warn-bg);border-color:var(--warn-b);color:var(--warn);font-weight:600}
+.chip.bad{background:var(--bad-bg);border-color:var(--bad-b);color:var(--bad);font-weight:600}
+.status{font-size:13px;padding:8px 12px;border-radius:10px;margin-top:10px}
+.status.ok{background:var(--green-l);color:var(--green-d)}
+.status.warn{background:var(--warn-bg);color:var(--warn)}
+.status.bad{background:var(--bad-bg);color:var(--bad)}
+ul.issues{margin:6px 0 0 0;padding-left:20px;font-size:13px}
+ul.issues li{margin:2px 0}
+
+/* 复选框 */
+.check{display:flex;gap:10px;align-items:flex-start;padding:11px 12px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;background:#fff}
+.check input{width:22px;height:22px;margin:2px 0 0;accent-color:var(--green);flex:0 0 auto}
+.check span{font-size:15px}
+.check:has(input:checked){background:var(--green-l);border-color:var(--green-b)}
+.bar{height:8px;background:#eef1ef;border-radius:99px;overflow:hidden;margin:10px 0 4px}
+.bar>i{display:block;height:100%;background:var(--green);width:0;transition:width .2s}
+
+/* 轮次 */
+.roundbox{border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px;background:#fcfdfc}
+.roundbox.active{border-color:var(--green-b);background:#fff}
+.roundbox.locked{background:#fafafa}
+.roundhd{display:flex;justify-content:space-between;align-items:center;font-weight:700;font-size:15px;margin-bottom:8px}
+.tag{font-size:12px;font-weight:600;border-radius:99px;padding:2px 10px;background:#eef1ef;color:var(--sub)}
+.tag.on{background:var(--green-l);color:var(--green-d)}
+.tag.off{background:#f3f4f6;color:#9ca3af}
+
+#toast{
+  position:fixed;left:50%;transform:translateX(-50%);bottom:22px;z-index:60;
+  background:#111827;color:#fff;padding:12px 18px;border-radius:12px;font-size:15px;
+  max-width:88vw;opacity:0;pointer-events:none;transition:opacity .25s;
+}
+#toast.show{opacity:1}
+footer{color:var(--sub);font-size:12px;padding:16px 0 30px;text-align:center}
+</style>
+</head>
+<body>
+
+<div class="timerbar">
+  <div class="inner">
+    <div>
+      <div class="tlabel">剩余时间</div>
+      <div id="tDisp">90:00</div>
+    </div>
+    <div class="tbtns">
+      <button class="btn" id="btnStart">开始打磨</button>
+      <button class="btn gray" id="btnPause" disabled>暂停</button>
+      <button class="btn gray" id="btnReset">重置</button>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+  <header class="hd">
+    <h1>口播稿打磨台</h1>
+    <p class="sub">90分钟，四道检查，两轮修改，停止内耗。</p>
+    <p class="tip">这是审稿台，不是生成器。稿子你自己写，这里只负责逼你在 90 分钟内改完、停手。<br>所有内容只保存在本机浏览器（localStorage），不上传服务器，不登录，不同步。</p>
+  </header>
+
+  <div class="banner" id="stopBanner">已停稿。两轮修改结束，请直接导出，不要再改。</div>
+
+  <!-- 1 基本信息 -->
+  <section class="card">
+    <h2><span class="no">1</span>基本信息</h2>
+    <p class="desc">先把边界钉死，后面所有判断都对着这四行。</p>
+    <label class="f"><span class="lb">作品选题</span>
+      <input type="text" id="mTopic" placeholder="例：总是熬夜的人，如何靠一张睡前清单改善状态？"></label>
+    <label class="f"><span class="lb">目标时长</span>
+      <input type="text" id="mDur" placeholder="例：60 秒 / 90 秒"></label>
+    <label class="f"><span class="lb">目标平台</span>
+      <select id="mPlat">
+        <option value="">请选择</option>
+        <option>抖音</option><option>视频号</option><option>小红书</option>
+        <option>B站</option><option>播客</option><option>公众号（视频）</option><option>其他</option>
+      </select></label>
+    <label class="f"><span class="lb">目标观众</span>
+      <input type="text" id="mAud" placeholder="例：想减少熬夜但没有系统方法的人"></label>
+  </section>
+
+  <!-- 2 AI 初稿 -->
+  <section class="card">
+    <h2><span class="no">2</span>AI 初稿输入</h2>
+    <p class="desc">粘贴 AI 给你的初稿（建议 3000 字以内）。这一版只是原料。</p>
+    <textarea id="draft" placeholder="把 AI 初稿整段粘贴进来…"></textarea>
+    <div class="row">
+      <button class="btn ghost" id="btnDemo">加载示例</button>
+      <button class="btn gray" id="btnClear">清空</button>
+    </div>
+    <div class="stat">
+      <span>字数 <b id="cCount">0</b></span>
+      <span>预计口播时长 <b id="cTime">0:00</b></span>
+      <span id="cFit"></span>
+    </div>
+    <div class="hint">按每分钟约 250 字估算；语速快慢会有出入，只作参考。</div>
+  </section>
+
+  <!-- 3 四道检查 -->
+  <section class="card">
+    <h2><span class="no">3</span>四道检查</h2>
+    <p class="desc">结果实时更新。四道不全绿，就别往下走。</p>
+    <div class="chips">
+      <span class="chip" id="chipFact">事实检查：待填</span>
+      <span class="chip" id="chipCon">反差公式：0/4</span>
+      <span class="chip" id="chipStyle">口播风格：0/10</span>
+      <span class="chip" id="chipOpen">开头三句：0/4</span>
+    </div>
+
+    <!-- 事实检查 -->
+    <fieldset style="margin-top:6px">
+      <h2 style="font-size:16px"><span class="no">3-1</span>事实检查</h2>
+      <p class="desc">无来源的事实标黄；推断必须写「我认为」；无法核实的内容不能进终稿。</p>
+      <label class="f"><span class="lb">引用事实（一条一行）</span>
+        <textarea id="fFacts" placeholder="例：成年人推荐睡眠时长为 7–9 小时"></textarea>
+        <div class="hint" id="hFacts"></div></label>
+      <label class="f"><span class="lb">事实来源（对应上面的每一条）</span>
+        <textarea id="fSrc" placeholder="例：美国睡眠医学会（AASM）公开建议"></textarea></label>
+      <label class="f"><span class="lb">我认为是推断的内容（每条都要带「我认为」）</span>
+        <textarea id="fInfer" placeholder="例：我认为熬夜的核心不是自律，而是缺少停止动作"></textarea>
+        <div class="hint" id="hInfer"></div></label>
+      <label class="f"><span class="lb">无法核实的内容（写了就不能进终稿）</span>
+        <textarea id="fUnver" placeholder="查不到出处的，一律写在这里，然后从稿子里删掉"></textarea></label>
+      <div class="status" id="stFact"></div>
+    </fieldset>
+
+    <hr style="border:0;border-top:1px solid var(--line);margin:18px 0">
+
+    <!-- 反差公式 -->
+    <fieldset>
+      <h2 style="font-size:16px"><span class="no">3-2</span>反差公式检查</h2>
+      <p class="desc">四项全部填写才通过。说不清反差，这条稿子就没有钩子。</p>
+      <label class="f"><span class="lb">前：他原来是什么人？</span>
+        <textarea id="cBefore" style="min-height:80px" placeholder="例：每晚刷手机到两点、白天靠咖啡撑着的人"></textarea></label>
+      <label class="f"><span class="lb">桥：哪件普通事带来转变？</span>
+        <textarea id="cBridge" style="min-height:80px" placeholder="例：睡前花两分钟写一张三行清单"></textarea></label>
+      <label class="f"><span class="lb">后：他后来变成什么人？</span>
+        <textarea id="cAfter" style="min-height:80px" placeholder="例：能在固定时间主动放下手机的人"></textarea></label>
+      <label class="f"><span class="lb">落：这对观众有什么用？</span>
+        <textarea id="cPayoff" style="min-height:80px" placeholder="例：观众今晚就能照着写一张，不用靠意志力"></textarea></label>
+      <div class="status" id="stCon"></div>
+    </fieldset>
+
+    <hr style="border:0;border-top:1px solid var(--line);margin:18px 0">
+
+    <!-- 口播风格 -->
+    <fieldset>
+      <h2 style="font-size:16px"><span class="no">3-3</span>口播风格检查</h2>
+      <p class="desc">逐句念一遍，做到的打勾。10 项全中才算过。</p>
+      <div class="bar"><i id="styleBar"></i></div>
+      <div id="styleList"></div>
+      <div class="status" id="stStyle"></div>
+    </fieldset>
+
+    <hr style="border:0;border-top:1px solid var(--line);margin:18px 0">
+
+    <!-- 开头三句 -->
+    <fieldset>
+      <h2 style="font-size:16px"><span class="no">3-4</span>开头三句检查</h2>
+      <p class="desc">四项全通过才显示「开头过关」。前 3 秒没人停，后面写得再好也没用。</p>
+      <div id="openList"></div>
+      <div class="status" id="stOpen"></div>
+    </fieldset>
+  </section>
+
+  <!-- 4 修改轮次 -->
+  <section class="card">
+    <h2><span class="no">4</span>修改轮次</h2>
+    <p class="desc">最多两轮。第一轮改结构和硬伤，第二轮只改念不顺的地方。第二轮结束必须停稿。</p>
+
+    <div class="roundbox" id="boxR1">
+      <div class="roundhd"><span>第一轮修改</span><span class="tag" id="tagR1">未开始</span></div>
+      <textarea id="r1" placeholder="把改完的完整稿粘进来（不是写修改说明）"></textarea>
+      <div class="row">
+        <button class="btn ghost" id="btnCopy1">沿用 AI 初稿</button>
+      </div>
+    </div>
+
+    <div class="roundbox" id="boxR2">
+      <div class="roundhd"><span>第二轮修改</span><span class="tag" id="tagR2">未开始</span></div>
+      <textarea id="r2" placeholder="第二轮：只改念不顺、绕口、没推进的地方"></textarea>
+      <div class="row">
+        <button class="btn ghost" id="btnCopy2">沿用第一轮</button>
+      </div>
+    </div>
+
+    <button class="btn wide" id="btnRound">完成第一轮修改，进入第二轮</button>
+    <div class="hint" id="hRound"></div>
+  </section>
+
+  <!-- 5 计时器说明 + 6 导出 -->
+  <section class="card">
+    <h2><span class="no">5</span>90 分钟计时器</h2>
+    <p class="desc">顶部那条就是计时器。规则写在下面：60 分钟提示「还有三分之一时间」；80 分钟提示「只做硬伤，不优化表达」；90 分钟直接停稿。</p>
+    <div class="stat"><span>已用时 <b id="usedTime">0:00</b></span><span>状态 <b id="runState">未开始</b></span></div>
+    <div class="hint" id="tHint"></div>
+  </section>
+
+  <section class="card">
+    <h2><span class="no">6</span>导出</h2>
+    <p class="desc">导出 Markdown：选题、目标观众、最终稿、四道检查结果、两轮修改记录、总耗时、停稿时间。</p>
+    <div class="row">
+      <button class="btn" id="btnGen">导出 Markdown</button>
+      <button class="btn ghost" id="btnCopyMd">复制</button>
+      <button class="btn gray" id="btnDown">下载 .md</button>
+    </div>
+    <textarea id="mdOut" style="min-height:220px;margin-top:12px;font-size:14px" placeholder="点「导出 Markdown」后在这里生成，可直接全选复制"></textarea>
+  </section>
+
+  <footer>
+    数据只存在你这台设备的浏览器里。换设备、清缓存、无痕模式都会丢，重要稿件请先导出。<br>
+    没有登录，没有云同步，没有会员。
+  </footer>
+</div>
+
+<div id="toast"></div>
+
+<script>
+(function(){
+"use strict";
+var KEY="kougao-damotai-v1";
+var TOTAL=90*60*1000;
+var $=function(s){return document.querySelector(s);};
+
+var STYLE_ITEMS=[
+  "一句一意","短句直给","删除长定语","删除解释腔","不用书面词",
+  "念起来不绕口","每段有推进","没有重复说法","没有空话","结尾有动作或判断"
+];
+var OPEN_ITEMS=[
+  "第一句让人停住","第二句给出冲突","第三句承诺价值","前三句没有背景铺垫"
+];
+var DEMO={
+  topic:"总是熬夜的人，如何靠一张睡前清单改善状态？",
+  audience:"想减少熬夜但没有系统方法的人。",
+  draft:"很多人都知道熬夜不好，但每天晚上还是忍不住刷手机。其实熬夜并不是自律问题，而是一个缺少停止动作的问题。我今天给你分享一个很简单的方法，就是睡前清单。它可以帮助你从无意识刷手机，切换到有意识准备睡觉。你只需要在每天晚上十点半，写下三件事：明天最重要的任务、今天完成的一件小事、放下手机的位置。坚持一周，你会发现自己对夜晚的控制感明显增强。"
+};
+
+function blank(){
+  return {
+    v:1,
+    meta:{topic:"",dur:"",plat:"",aud:""},
+    draft:"",
+    fact:{facts:"",src:"",infer:"",unver:""},
+    con:{a:"",b:"",c:"",d:""},
+    style:STYLE_ITEMS.map(function(){return false;}),
+    open:OPEN_ITEMS.map(function(){return false;}),
+    r1:"", r2:"",
+    stage:"r1",                 // r1 | r2 | done | stopped
+    r1At:null, r2At:null,
+    timer:{running:false,base:0,startedAt:null,n60:false,n80:false},
+    stoppedAt:null, stopUsed:null
+  };
+}
+var S=blank();
+
+/* ---------- 存储 ---------- */
+var saveT=null;
+function save(now){
+  if(saveT){clearTimeout(saveT);saveT=null;}
+  var doIt=function(){
+    try{localStorage.setItem(KEY,JSON.stringify(S));}
+    catch(e){toast("保存失败：浏览器存储不可用或已满，请先导出");}
+  };
+  if(now){doIt();}else{saveT=setTimeout(doIt,400);}
+}
+function load(){
+  try{
+    var raw=localStorage.getItem(KEY);
+    if(!raw) return;
+    var o=JSON.parse(raw);
+    if(!o||typeof o!=="object") return;
+    var b=blank();
+    S={
+      v:1,
+      meta:Object.assign(b.meta,o.meta||{}),
+      draft:typeof o.draft==="string"?o.draft:"",
+      fact:Object.assign(b.fact,o.fact||{}),
+      con:Object.assign(b.con,o.con||{}),
+      style:(Array.isArray(o.style)&&o.style.length===10)?o.style.map(Boolean):b.style,
+      open:(Array.isArray(o.open)&&o.open.length===4)?o.open.map(Boolean):b.open,
+      r1:typeof o.r1==="string"?o.r1:"",
+      r2:typeof o.r2==="string"?o.r2:"",
+      stage:["r1","r2","done","stopped"].indexOf(o.stage)>=0?o.stage:"r1",
+      r1At:o.r1At||null, r2At:o.r2At||null,
+      timer:Object.assign(b.timer,o.timer||{}),
+      stoppedAt:o.stoppedAt||null, stopUsed:(typeof o.stopUsed==="number"?o.stopUsed:null)
+    };
+    if(S.timer.running && !S.timer.startedAt){S.timer.running=false;}
+  }catch(e){ /* 数据坏了就用空白状态 */ }
+}
+
+/* ---------- 小工具 ---------- */
+var toastT=null;
+function toast(msg,ms){
+  var t=$("#toast"); t.textContent=msg; t.classList.add("show");
+  if(toastT)clearTimeout(toastT);
+  toastT=setTimeout(function(){t.classList.remove("show");},ms||4200);
+}
+function mmss(ms){
+  if(ms<0)ms=0;
+  var s=Math.floor(ms/1000), m=Math.floor(s/60), r=s%60;
+  return m+":"+(r<10?"0":"")+r;
+}
+function mmssCeil(ms){
+  if(ms<0)ms=0;
+  var s=Math.ceil(ms/1000), m=Math.floor(s/60), r=s%60;
+  return m+":"+(r<10?"0":"")+r;
+}
+function usedText(ms){
+  var s=Math.round(ms/1000), m=Math.floor(s/60), r=s%60;
+  if(m<=0) return r+"秒";
+  return m+"分"+(r<10?"0":"")+r+"秒";
+}
+function stamp(iso){
+  if(!iso) return "";
+  var d=new Date(iso);
+  function p(n){return (n<10?"0":"")+n;}
+  return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+" "+p(d.getHours())+":"+p(d.getMinutes());
+}
+function esc(s){return String(s==null?"":s);}
+
+/* ---------- 计时 ---------- */
+function elapsed(){
+  var t=S.timer;
+  return t.base + (t.running&&t.startedAt ? (Date.now()-t.startedAt) : 0);
+}
+function tick(){
+  var t=S.timer, rem=TOTAL-elapsed();
+  if(rem<=0){rem=0;}
+  // 只做提示与到点停稿，不做例行保存：避免 250ms 的 tick 不断重置输入防抖保存
+  if(!t.n60 && elapsed()>=60*60*1000){t.n60=true; save(true); toast("已用 60 分钟：还有三分之一时间，别再改开头了。");}
+  if(!t.n80 && elapsed()>=80*60*1000){t.n80=true; save(true); toast("已用 80 分钟：只做硬伤，不优化表达。");}
+  if(rem<=0 && S.stage!=="stopped"){ stopWork(true); }
+  renderTimer();
+}
+function startTimer(){
+  var t=S.timer;
+  if(S.stage==="stopped"){toast("已停稿，不能重新计时。要再来一稿请点底部「清空全部数据」。");return;}
+  if(t.running)return;
+  t.startedAt=Date.now(); t.running=true;
+  renderTimer(); save(true); toast("开始打磨。90 分钟后自动停稿。");
+}
+function pauseTimer(){
+  var t=S.timer;
+  if(!t.running)return;
+  t.base += Date.now()-t.startedAt; t.running=false; t.startedAt=null;
+  renderTimer(); save(true); toast("已暂停。");
+}
+function resetTimer(){
+  if(S.stage==="stopped"){toast("已停稿，计时器已锁定。要重新开始请用底部「清空全部数据」。");return;}
+  if(!confirm("重置计时器：已用时间清零，两个提示也会重新来一次。继续？"))return;
+  S.timer={running:false,base:0,startedAt:null,n60:false,n80:false};
+  renderTimer(); save(true); toast("计时器已重置。");
+}
+function stopWork(auto){
+  var t=S.timer;
+  if(t.running){t.base+=Date.now()-t.startedAt;t.running=false;t.startedAt=null;}
+  S.stage="stopped";
+  S.stopUsed=elapsed();
+  S.stoppedAt=new Date().toISOString();
+  save(true); refresh();
+  toast(auto?"90 分钟到了，停稿。请直接导出。":"已停稿。请直接导出。",6000);
+}
+
+/* ---------- 计算 ---------- */
+function factInfo(){
+  var f=S.fact;
+  var hasFact=!!f.facts.trim(), hasSrc=!!f.src.trim();
+  var lines=f.infer.split(/\n+/).map(function(x){return x.trim();}).filter(Boolean);
+  var badInfer=lines.filter(function(l){return l.indexOf("我认为")<0;});
+  var hasUn=!!f.unver.trim();
+  var issues=[];
+  if(hasFact&&!hasSrc) issues.push("有引用事实，但没填来源：这条事实现在按「无来源」处理，稿里要么补来源，要么删掉。");
+  if(badInfer.length) issues.push("有 "+badInfer.length+" 条推断没带「我认为」，观众会当事实听。");
+  if(hasUn) issues.push("有无法核实的内容：这些内容不能进入终稿，删掉或换说法。");
+  var touched=hasFact||hasSrc||hasUn||lines.length>0;
+  return {touched:touched,ok:issues.length===0,issues:issues,noSrc:(hasFact&&!hasSrc),badInfer:badInfer.length,hasUn:hasUn};
+}
+function conCount(){
+  var c=S.con,n=0;
+  ["a","b","c","d"].forEach(function(k){if(c[k].trim())n++;});
+  return n;
+}
+function styleCount(){return S.style.filter(Boolean).length;}
+function openCount(){return S.open.filter(Boolean).length;}
+function allGreen(){
+  var fi=factInfo();
+  return (fi.touched && fi.ok) && conCount()===4 && styleCount()===10 && openCount()===4;
+}
+function finalText(){
+  if(S.r2.trim()) return {txt:S.r2.trim(),from:"第二轮修改"};
+  if(S.r1.trim()) return {txt:S.r1.trim(),from:"第一轮修改"};
+  if(S.draft.trim()) return {txt:S.draft.trim(),from:"AI 初稿（还没改过）"};
+  return {txt:"",from:"（空）"};
+}
+
+/* ---------- 渲染 ---------- */
+function setChip(el,text,cls){
+  el.textContent=text; el.className="chip"+(cls?" "+cls:"");
+}
+function renderTimer(){
+  var rem=TOTAL-elapsed(); if(rem<0)rem=0;
+  var d=$("#tDisp"); d.textContent=mmssCeil(rem);
+  d.className = rem<=10*60*1000 ? "over" : (rem<=30*60*1000 ? "mid" : "");
+  $("#btnStart").disabled = S.timer.running || S.stage==="stopped";
+  $("#btnPause").disabled = !S.timer.running;
+  $("#btnReset").disabled = S.stage==="stopped";
+  $("#tHint").textContent = S.stage==="stopped" ? "已停稿：开始 / 暂停 / 重置全部锁定。要重新开始请用底部「清空全部数据」。" : "";
+  $("#usedTime").textContent=mmss(elapsed());
+  $("#runState").textContent = S.stage==="stopped" ? "已停稿" : (S.timer.running?"进行中":(elapsed()>0?"已暂停":"未开始"));
+}
+function renderDraft(){
+  var n=S.draft.length;
+  $("#cCount").textContent=n;
+  $("#cTime").textContent=mmss(n*240); // 250字/分钟 → 0.24 秒/字
+  var fit=$("#cFit");
+  if(n>3000){fit.innerHTML='<span class="over">超出 3000 字建议上限，先砍再改</span>';}
+  else{fit.textContent="";}
+}
+function renderFact(){
+  var i=factInfo();
+  $("#fFacts").className = i.noSrc ? "warn" : "";
+  $("#fUnver").className = i.hasUn ? "bad" : "";
+  $("#hFacts").textContent = i.noSrc ? "标黄 = 无来源事实。补来源，或者从稿子里删掉。" : "";
+  $("#hInfer").textContent = i.badInfer ? ("还有 "+i.badInfer+" 条推断没带「我认为」。") : "";
+  var st=$("#stFact");
+  if(!i.touched){st.className="status"; st.textContent="未填写。把稿子里的事实、来源、推断、存疑项分开抄进来。";}
+  else if(i.ok){st.className="status ok"; st.textContent="事实检查通过：有事实就有来源，推断都标了「我认为」，没有无法核实的内容。";}
+  else{st.className="status bad"; st.innerHTML="事实检查未通过<ul class='issues'></ul>";
+    var ul=st.querySelector("ul");
+    i.issues.forEach(function(x){var li=document.createElement("li");li.textContent=x;ul.appendChild(li);});}
+  setChip($("#chipFact"), i.touched?(i.ok?"事实检查：通过":"事实检查：待修正"):"事实检查：待填",
+          i.touched?(i.ok?"ok":"bad"):"");
+}
+function renderCon(){
+  var n=conCount();
+  var st=$("#stCon");
+  if(n===4){st.className="status ok"; st.textContent="反差公式通过：前 / 桥 / 后 / 落 四项齐全。";}
+  else{st.className="status warn"; st.textContent="反差公式 "+n+"/4：四项全部填写才通过。";}
+  setChip($("#chipCon"),"反差公式："+n+"/4", n===4?"ok":(n>0?"warn":""));
+}
+function renderStyle(){
+  var n=styleCount();
+  $("#styleBar").style.width=(n*10)+"%";
+  var st=$("#stStyle");
+  if(n===10){st.className="status ok"; st.textContent="口播风格通过：10/10。";}
+  else{st.className="status warn"; st.textContent="口播风格进度 "+n+"/10：还差 "+(10-n)+" 项。";}
+  setChip($("#chipStyle"),"口播风格："+n+"/10", n===10?"ok":(n>=7?"warn":""));
+}
+function renderOpen(){
+  var n=openCount();
+  var st=$("#stOpen");
+  if(n===4){st.className="status ok"; st.textContent="开头过关。";}
+  else{st.className="status warn"; st.textContent="开头三句 "+n+"/4：未过关，四项全部通过才显示「开头过关」。";}
+  setChip($("#chipOpen"),"开头三句："+n+"/4", n===4?"ok":(n>0?"warn":""));
+}
+function renderRounds(){
+  var stopped=(S.stage==="stopped");
+  var b1=$("#boxR1"), b2=$("#boxR2");
+  b1.className="roundbox"+(S.stage==="r1"&&!stopped?" active":" locked");
+  b2.className="roundbox"+(S.stage==="r2"&&!stopped?" active":" locked");
+  $("#r1").readOnly = S.stage!=="r1" || stopped;
+  $("#r2").readOnly = S.stage!=="r2" || stopped;
+  $("#btnCopy1").disabled = S.stage!=="r1" || stopped;
+  $("#btnCopy2").disabled = S.stage!=="r2" || stopped;
+
+  var t1=$("#tagR1"), t2=$("#tagR2");
+  t1.className="tag"+(S.r1.trim()?" on":""); t1.textContent = S.r1At?("完成于 "+stamp(S.r1At)):(S.r1.trim()?"编辑中":"未开始");
+  t2.className="tag"+(S.r2.trim()?" on":""); t2.textContent = S.r2At?("完成于 "+stamp(S.r2At)):(S.r2.trim()?"编辑中":(S.stage==="r1"?"未开始":"可编辑")) ;
+
+  var btn=$("#btnRound");
+  if(S.stage==="r1"){btn.textContent="完成第一轮修改，进入第二轮";btn.disabled=!S.r1.trim();btn.className="btn wide";}
+  else if(S.stage==="r2"){btn.textContent="完成第二轮修改";btn.disabled=!S.r2.trim();btn.className="btn wide";}
+  else if(S.stage==="done"){btn.textContent="停稿，进入导出";btn.disabled=false;btn.className="btn wide";}
+  else{btn.textContent="已停稿（两轮修改结束）";btn.disabled=true;btn.className="btn wide";}
+
+  $("#hRound").textContent = S.stage==="r1"
+    ? "第一轮改结构和硬伤：事实、反差、开头。别抠字眼。"
+    : (S.stage==="r2" ? "第二轮只改念不顺、绕口、没推进的地方。改完就停。"
+    : (S.stage==="done" ? "两轮用完。点上面的按钮停稿，然后导出。" : "已停稿：只做导出，不再改稿。"));
+
+  $("#stopBanner").className = stopped?"banner show":"banner";
+}
+function refresh(){
+  renderTimer();renderDraft();renderFact();renderCon();renderStyle();renderOpen();renderRounds();
+}
+
+/* ---------- 列表构建 ---------- */
+function buildList(box,items,arr,onChange){
+  box.innerHTML="";
+  items.forEach(function(txt,i){
+    var lab=document.createElement("label");
+    lab.className="check";
+    var cb=document.createElement("input");
+    cb.type="checkbox"; cb.checked=!!arr[i]; cb.setAttribute("data-i",String(i));
+    var sp=document.createElement("span"); sp.textContent=txt;
+    lab.appendChild(cb); lab.appendChild(sp);
+    cb.addEventListener("change",function(){arr[i]=cb.checked;onChange();save();});
+    box.appendChild(lab);
+  });
+}
+function syncChecks(box,arr){
+  Array.prototype.forEach.call(box.querySelectorAll("input[type=checkbox]"),function(cb){
+    cb.checked=!!arr[parseInt(cb.getAttribute("data-i"),10)];
+  });
+}
+
+/* ---------- 导出 ---------- */
+function buildMd(){
+  var f=finalText(), fi=factInfo(), used=(S.stopUsed!=null?S.stopUsed:elapsed());
+  var L=[];
+  L.push("# 口播稿打磨台 · 导出");
+  L.push("");
+  L.push("- 导出时间："+stamp(new Date().toISOString()));
+  L.push("- 停稿时间："+(S.stoppedAt?stamp(S.stoppedAt):"未停稿（中途导出）"));
+  L.push("- 总耗时："+usedText(used));
+  L.push("- 选题："+(S.meta.topic||"（未填写）"));
+  L.push("- 目标观众："+(S.meta.aud||"（未填写）"));
+  L.push("- 目标时长："+(S.meta.dur||"（未填写）"));
+  L.push("- 目标平台："+(S.meta.plat||"（未填写）"));
+  L.push("");
+  L.push("## 最终稿");
+  L.push("");
+  L.push("> 来源："+f.from+"　字数："+f.txt.length+"　预计口播时长："+mmss(f.txt.length*240));
+  L.push("");
+  L.push(f.txt||"（还没有稿子）");
+  L.push("");
+  L.push("## 四道检查结果");
+  L.push("");
+  L.push("### 1. 事实检查 —— "+(fi.touched?(fi.ok?"通过":"未通过"):"未填写"));
+  L.push("");
+  L.push("- 引用事实："+(S.fact.facts.trim()?("\n"+S.fact.facts.trim()):"（无）"));
+  L.push("- 事实来源："+(S.fact.src.trim()?("\n"+S.fact.src.trim()):"（无）"));
+  L.push("- 推断内容："+(S.fact.infer.trim()?("\n"+S.fact.infer.trim()):"（无）"));
+  L.push("- 无法核实："+(S.fact.unver.trim()?("\n"+S.fact.unver.trim()):"（无）"));
+  if(fi.issues.length){L.push("- 待处理：");fi.issues.forEach(function(x){L.push("  - "+x);});}
+  L.push("");
+  var cn=conCount();
+  L.push("### 2. 反差公式检查 —— "+cn+"/4 "+(cn===4?"通过":"未通过"));
+  L.push("");
+  L.push("- 前："+(S.con.a.trim()||"（未填写）"));
+  L.push("- 桥："+(S.con.b.trim()||"（未填写）"));
+  L.push("- 后："+(S.con.c.trim()||"（未填写）"));
+  L.push("- 落："+(S.con.d.trim()||"（未填写）"));
+  L.push("");
+  var sn=styleCount();
+  L.push("### 3. 口播风格检查 —— "+sn+"/10 "+(sn===10?"通过":"未通过"));
+  L.push("");
+  STYLE_ITEMS.forEach(function(t,i){L.push("- ["+(S.style[i]?"x":" ")+"] "+t);});
+  L.push("");
+  var on=openCount();
+  L.push("### 4. 开头三句检查 —— "+on+"/4 "+(on===4?"开头过关":"未过关"));
+  L.push("");
+  OPEN_ITEMS.forEach(function(t,i){L.push("- ["+(S.open[i]?"x":" ")+"] "+t);});
+  L.push("");
+  L.push("## 两轮修改记录");
+  L.push("");
+  L.push("### 第一轮修改"+(S.r1At?("（完成于 "+stamp(S.r1At)+"）"):"（未完成）"));
+  L.push("");
+  L.push(S.r1.trim()||"（未填写）");
+  L.push("");
+  L.push("### 第二轮修改"+(S.r2At?("（完成于 "+stamp(S.r2At)+"）"):"（未完成）"));
+  L.push("");
+  L.push(S.r2.trim()||"（未填写）");
+  L.push("");
+  L.push("## 计时");
+  L.push("");
+  L.push("- 规定时长：90 分钟");
+  L.push("- 实际用时："+usedText(used));
+  L.push("- 结束方式："+(S.stoppedAt?"停稿（两轮修改结束或 90 分钟到点）":"未停稿"));
+  L.push("");
+  L.push("---");
+  L.push("");
+  L.push("由《口播稿打磨台》导出。数据只存在本机浏览器，未上传任何服务器。");
+  return L.join("\n");
+}
+
+/* ---------- 事件 ---------- */
+function bindText(sel,getter,setter){
+  var el=$(sel);
+  el.addEventListener("input",function(){
+    setter(el.value); save(); refresh();
+  });
+  el.addEventListener("blur",function(){save(true);});
+}
+function init(){
+  load();
+
+  // 基本信息
+  $("#mTopic").value=S.meta.topic; $("#mDur").value=S.meta.dur;
+  $("#mPlat").value=S.meta.plat;   $("#mAud").value=S.meta.aud;
+  $("#mTopic").addEventListener("input",function(){S.meta.topic=this.value;save();});
+  $("#mDur").addEventListener("input",function(){S.meta.dur=this.value;save();});
+  $("#mPlat").addEventListener("change",function(){S.meta.plat=this.value;save();});
+  $("#mAud").addEventListener("input",function(){S.meta.aud=this.value;save();});
+
+  // 初稿
+  var dr=$("#draft"); dr.value=S.draft;
+  dr.addEventListener("input",function(){S.draft=this.value;save();renderDraft();});
+  dr.addEventListener("blur",function(){save(true);});
+
+  $("#btnDemo").addEventListener("click",function(){
+    if(S.draft.trim() && !confirm("加载示例会覆盖现在的选题、目标观众和 AI 初稿，继续？"))return;
+    S.meta.topic=DEMO.topic; S.meta.aud=DEMO.audience; S.draft=DEMO.draft;
+    $("#mTopic").value=S.meta.topic; $("#mAud").value=S.meta.aud; dr.value=S.draft;
+    save(true); refresh(); toast("示例已加载。目标时长 / 平台请自己填。");
+  });
+  $("#btnClear").addEventListener("click",function(){
+    if(!confirm("清空 AI 初稿？这一步不影响其他内容。"))return;
+    S.draft=""; dr.value=""; save(true); renderDraft();
+  });
+
+  // 事实
+  bindText("#fFacts",null,function(v){S.fact.facts=v;});
+  bindText("#fSrc",null,function(v){S.fact.src=v;});
+  bindText("#fInfer",null,function(v){S.fact.infer=v;});
+  bindText("#fUnver",null,function(v){S.fact.unver=v;});
+  $("#fFacts").value=S.fact.facts; $("#fSrc").value=S.fact.src;
+  $("#fInfer").value=S.fact.infer; $("#fUnver").value=S.fact.unver;
+
+  // 反差
+  $("#cBefore").value=S.con.a; $("#cBridge").value=S.con.b;
+  $("#cAfter").value=S.con.c;  $("#cPayoff").value=S.con.d;
+  bindText("#cBefore",null,function(v){S.con.a=v;});
+  bindText("#cBridge",null,function(v){S.con.b=v;});
+  bindText("#cAfter",null,function(v){S.con.c=v;});
+  bindText("#cPayoff",null,function(v){S.con.d=v;});
+
+  // 风格 / 开头
+  buildList($("#styleList"),STYLE_ITEMS,S.style,renderStyle);
+  buildList($("#openList"),OPEN_ITEMS,S.open,renderOpen);
+
+  // 轮次
+  var r1=$("#r1"), r2=$("#r2");
+  r1.value=S.r1; r2.value=S.r2;
+  r1.addEventListener("input",function(){S.r1=this.value;save();renderRounds();});
+  r2.addEventListener("input",function(){S.r2=this.value;save();renderRounds();});
+  r1.addEventListener("blur",function(){save(true);});
+  r2.addEventListener("blur",function(){save(true);});
+  $("#btnCopy1").addEventListener("click",function(){
+    if(!S.draft.trim()){toast("AI 初稿是空的，没东西可沿用。");return;}
+    S.r1=S.draft; r1.value=S.r1; save(true); renderRounds(); toast("已把 AI 初稿铺进第一轮，在上面改。");
+  });
+  $("#btnCopy2").addEventListener("click",function(){
+    if(!S.r1.trim()){toast("第一轮还是空的。");return;}
+    S.r2=S.r1; r2.value=S.r2; save(true); renderRounds(); toast("已把第一轮铺进第二轮，在上面改。");
+  });
+  $("#btnRound").addEventListener("click",function(){
+    if(S.stage==="r1"){
+      if(!S.r1.trim()){toast("第一轮还是空的，先改一版。");return;}
+      if(!allGreen() && !confirm("四道检查还没有全绿。确定要先进入第二轮修改吗？"))return;
+      S.r1At=new Date().toISOString(); S.stage="r2"; save(true); refresh();
+      toast("第一轮完成。第二轮只改念不顺的地方。");
+    }else if(S.stage==="r2"){
+      if(!S.r2.trim()){toast("第二轮还是空的。");return;}
+      S.r2At=new Date().toISOString(); S.stage="done"; save(true); refresh();
+      toast("两轮用完，停稿。");
+    }else if(S.stage==="done"){
+      stopWork(false);
+      $("#mdOut").scrollIntoView({behavior:"smooth",block:"center"});
+    }
+  });
+
+  // 计时器
+  $("#btnStart").addEventListener("click",startTimer);
+  $("#btnPause").addEventListener("click",pauseTimer);
+  $("#btnReset").addEventListener("click",resetTimer);
+
+  // 导出
+  $("#btnGen").addEventListener("click",function(){
+    $("#mdOut").value=buildMd();
+    toast("已生成 Markdown，可直接复制。");
+  });
+  $("#btnCopyMd").addEventListener("click",function(){
+    var ta=$("#mdOut");
+    if(!ta.value){ta.value=buildMd();}
+    var txt=ta.value;
+    function fallback(){
+      ta.focus(); ta.select();
+      try{document.execCommand("copy");toast("已复制。");}
+      catch(e){toast("复制失败，请手动全选复制。");}
+    }
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(txt).then(function(){toast("已复制到剪贴板。");},fallback);
+    }else{fallback();}
+  });
+  $("#btnDown").addEventListener("click",function(){
+    if(!$("#mdOut").value){$("#mdOut").value=buildMd();}
+    var name="口播稿-"+(S.meta.topic?S.meta.topic.replace(/[\\/:*?"<>|\n\r\t]/g,"").slice(0,30):"未命名")+".md";
+    try{
+      var blob=new Blob([$("#mdOut").value],{type:"text/markdown;charset=utf-8"});
+      var a=document.createElement("a");
+      a.href=URL.createObjectURL(blob); a.download=name;
+      document.body.appendChild(a); a.click();
+      setTimeout(function(){URL.revokeObjectURL(a.href);a.remove();},1000);
+      toast("已下载 "+name);
+    }catch(e){toast("下载失败，请手动复制。");}
+  });
+
+  // 底部：清空全部
+  var clr=document.createElement("div");
+  clr.style.cssText="text-align:center;margin:18px 0 30px";
+  var b=document.createElement("button");
+  b.className="btn gray"; b.textContent="清空全部数据（重新开始）";
+  b.addEventListener("click",function(){
+    if(!confirm("会清掉选题、初稿、四道检查、两轮修改和计时，且无法恢复。建议先导出。确定清空？"))return;
+    try{localStorage.removeItem(KEY);}catch(e){}
+    S=blank();
+    ["#mTopic","#mDur","#mAud"].forEach(function(s){$(s).value="";});
+    $("#mPlat").value="";
+    ["#draft","#fFacts","#fSrc","#fInfer","#fUnver","#cBefore","#cBridge","#cAfter","#cPayoff","#r1","#r2","#mdOut"].forEach(function(s){$(s).value="";});
+    syncChecks($("#styleList"),S.style); syncChecks($("#openList"),S.open);
+    save(true); refresh(); toast("已清空。");
+  });
+  clr.appendChild(b);
+  document.querySelector("footer").parentNode.insertBefore(clr,document.querySelector("footer"));
+
+  setInterval(tick,250);
+  window.addEventListener("beforeunload",function(){save(true);});
+  document.addEventListener("visibilitychange",function(){
+    if(document.hidden){save(true);}else{renderTimer();}
+  });
+  window.addEventListener("focus",renderTimer);
+  window.addEventListener("pageshow",renderTimer);
+  refresh();
+}
+if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",init);}else{init();}
+})();
+</script>
+</body>
+</html>
